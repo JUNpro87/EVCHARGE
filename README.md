@@ -4,3 +4,8 @@
 
 - `index.html` — 단일 파일 웹 앱 (브라우저로 열면 바로 동작)
 - 입력한 요금은 브라우저 localStorage에만 저장됩니다.
+
+## 배포
+
+`main` 브랜치에 푸시하면 GitHub Actions(`.github/workflows/pages.yml`)가 GitHub Pages로 배포합니다.
+최초 1회: 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 설정하세요.
