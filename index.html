@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>전기충전 요금표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 한 열 모바일 도구 — 지금 상태 → 오늘 24시간 띠 → 계산기 → 요금 설정 */
+:root{
+  color-scheme:light;
+  --bg:#f3f5f4; --surface:#ffffff; --fg:#17201d; --muted:#5d6b66; --line:#d9e0dd;
+  --accent:#0f6e5a; --accent-soft:#e2f1ec;
+  --off:#dce9fb; --off-fg:#1d4f91;      /* 경부하 */
+  --mid:#fbf1cf; --mid-fg:#7a5a00;      /* 중간부하 */
+  --peak:#fbdcdc; --peak-fg:#a12a2a;    /* 최대부하 */
+  --pc:#1b8a4a; --env:#2a5fb8; --red:#c0392b; --epit:#7a3fb5; --sk:#d96a00; --kepco:#0b7fa3;
+  --font-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#18201d; --fg:#e6ece9; --muted:#93a39d; --line:#2a3531;
+  --accent:#4cc3a3; --accent-soft:#1d3a31;
+  --off:#1c2d45; --off-fg:#9cc2f5; --mid:#3a3112; --mid-fg:#f0cf6a; --peak:#45201f; --peak-fg:#f3a0a0;
+  --pc:#4fcf85; --env:#7ea8f2; --red:#ee7b6d; --epit:#c49af0; --sk:#f5a254; --kepco:#5cc6e6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#18201d; --fg:#e6ece9; --muted:#93a39d; --line:#2a3531;
+  --accent:#4cc3a3; --accent-soft:#1d3a31;
+  --off:#1c2d45; --off-fg:#9cc2f5; --mid:#3a3112; --mid-fg:#f0cf6a; --peak:#45201f; --peak-fg:#f3a0a0;
+  --pc:#4fcf85; --env:#7ea8f2; --red:#ee7b6d; --epit:#c49af0; --sk:#f5a254; --kepco:#5cc6e6; color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5}
+img{max-width:100%}
+[hidden]:not([hidden=until-found i]){display:none!important}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:18px}
+h1{font-size:22px;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-size:15px;margin:0 0 10px;font-weight:700}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+section{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.label{font-size:11px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+/* 지금 */
+.now-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700}
+.b-off{background:var(--off);color:var(--off-fg)} .b-mid{background:var(--mid);color:var(--mid-fg)} .b-peak{background:var(--peak);color:var(--peak-fg)}
+.verdict{margin-top:12px;padding:12px;border-radius:10px;background:var(--accent-soft)}
+.verdict b{font-size:19px}
+.rates{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:12px}
+.rate{border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.rate .who{font-size:12px;font-weight:700}
+.rate .v{font-size:17px}
+.rate.win{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.next{margin-top:10px;font-size:13px;color:var(--muted)}
+/* 띠 */
+.strip{display:grid;grid-template-columns:repeat(24,1fr);height:34px;border-radius:8px;overflow:hidden;position:relative}
+.strip div{position:relative}
+.strip .nowmark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg);border-radius:2px}
+.ticks{display:grid;grid-template-columns:repeat(24,1fr);font-size:10px;color:var(--muted);margin-top:4px}
+.ticks span{text-align:left}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.daytabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:6px 12px}
+button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.winrow{display:grid;grid-template-columns:repeat(24,1fr);height:8px;margin-top:6px;border-radius:4px;overflow:hidden}
+/* 폼 */
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);min-width:0}
+input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+input.num{font-family:var(--font-num)}
+.result{margin-top:14px;display:flex;flex-direction:column;gap:8px}
+.res{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.res.win{border-color:var(--accent);background:var(--accent-soft)}
+.res .n{font-weight:700}
+.res .c{font-size:18px;font-weight:600}
+.res .d{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.tag{font-size:11px;font-weight:700;color:var(--accent);margin-left:6px}
+.summary{font-size:14px;margin-top:4px}
+details summary{cursor:pointer;font-weight:700}
+.settings{display:flex;flex-direction:column;gap:14px;margin-top:12px}
+.set-h{font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.note{font-size:12px;color:var(--muted);margin:0}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px}
+.chk input{width:auto}
+.foot{font-size:12px;color:var(--muted);line-height:1.6}
+.speedbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.speedbar button{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;line-height:1.25;padding:6px 12px}
+.speedbar button small{font-size:11px;opacity:.75;font-family:var(--font-num)}
+.tbl-wrap{overflow-x:auto}
+table.sp{border-collapse:collapse;width:100%;font-size:13px;min-width:360px}
+table.sp th,table.sp td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.sp th:first-child,table.sp td:first-child{text-align:left}
+table.sp thead th{font-size:12px;color:var(--muted);font-weight:500}
+table.sp td.best{font-weight:700;color:var(--accent)}
+table.sp td.na{color:var(--muted);opacity:.5}
+table.sp tr.cur td{background:var(--accent-soft)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>전기충전 요금표</h1>
+  </header>
+
+  <nav class="speedbar" id="speedbar" role="group" aria-label="충전 속도 선택"></nav>
+
+  <section aria-labelledby="now-h">
+    <div class="now-top">
+      <div>
+        <div class="label" id="now-h">지금</div>
+        <div class="num" id="nowTime" style="font-size:20px;font-weight:600"></div>
+        <div class="sub" id="nowDay"></div>
+      </div>
+      <span class="pill" id="nowBand"></span>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="rates" id="nowRates"></div>
+    <div class="next" id="nextChange"></div>
+  </section>
+
+  <section aria-labelledby="sp-h">
+    <h2 id="sp-h">속도별 요금표 <span class="sub" id="spBand" style="font-weight:400"></span></h2>
+    <div class="tbl-wrap"><table class="sp" id="spTable"></table></div>
+    <p class="note" style="margin-top:8px">원/kWh · 행을 누르면 그 속도로 바뀌어요 · '–'는 그 사업자에 해당 속도 충전기가 없음</p>
+  </section>
+
+  <section aria-labelledby="strip-h">
+    <h2 id="strip-h">하루 시간대 (요금은 실제 충전된 시간대별로 계산)</h2>
+    <div class="daytabs" id="dayTabs" role="group" aria-label="요일 선택"></div>
+    <div class="strip" id="strip"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="label" style="margin-top:12px">이 시간대에 가장 싼 카드</div>
+    <div class="winrow" id="winrow"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section aria-labelledby="calc-h">
+    <h2 id="calc-h">충전 요금 계산기</h2>
+    <div class="grid2">
+      <label class="f" for="cStart">충전 시작
+        <input id="cStart" type="datetime-local">
+      </label>
+      <label class="f" for="cKwh">충전량 (kWh)
+        <input id="cKwh" class="num" type="number" min="1" step="1" value="30" inputmode="decimal">
+      </label>
+      <label class="f" for="cKw">충전기 출력 (kW)
+        <input id="cKw" class="num" type="number" min="1" step="0.1" value="7" inputmode="decimal">
+      </label>
+      <label class="f" for="cNow">&nbsp;
+        <button id="cNow" type="button">지금부터로 맞추기</button>
+      </label>
+    </div>
+    <div class="result" id="result"></div>
+  </section>
+
+  <section>
+    <details id="setBox">
+      <summary>요금 설정 (내가 직접 수정 가능)</summary>
+      <div class="settings">
+        <div>
+          <div class="set-h"><span class="dot" style="background:var(--pc)"></span>파워큐브 회원 (계시별)</div>
+          <div class="grid3">
+            <label class="f" for="pcOff">경부하<input id="pcOff" class="num" type="number" step="0.1"></label>
+            <label class="f" for="pcMid">중간부하<input id="pcMid" class="num" type="number" step="0.1"></label>
+            <label class="f" for="pcPeak">최대부하<input id="pcPeak" class="num" type="number" step="0.1"></label>
+          </div>
+          <p class="note" style="margin-top:6px">2026.8.4 적용 공지 기준. 부가세 포함.</p>
+        </div>
+        <div>
+          <div class="set-h"><span class="dot" style="background:var(--env)"></span>환경부 카드 (출력별 단일요금)</div>
+          <div class="grid3">
+            <label class="f" for="e1">30kW 미만<input id="e1" class="num" type="number" step="0.1"></label>
+            <label class="f" for="e2">30~50kW<input id="e2" class="num" type="number" step="0.1"></label>
+            <label class="f" for="e3">50~100kW<input id="e3" class="num" type="number" step="0.1"></label>
+            <label class="f" for="e4">100~200kW<input id="e4" class="num" type="number" step="0.1"></label>
+            <label class="f" for="e5">200kW 이상<input id="e5" class="num" type="number" step="0.1"></label>
+          </div>
+          <p class="note" style="margin-top:6px">환경부 충전소에서, 그리고 다른 사업자 충전기에서 환경부 카드로 로밍 결제할 때 적용되는 요금이에요. 2026.8.1 개편, 시간대와 상관없이 같음.</p>
+        </div>
+        <div id="extra" class="settings" style="margin-top:0"></div>
+        <div><button id="reset" type="button">기본값으로 되돌리기</button> <span class="note" id="resetMsg"></span></div>
+      </div>
+    </details>
+  </section>
+
+  <p class="foot">
+    시간대 구분은 한국전력 계시별 요금 기준입니다. 봄·여름·가을(3~10월) 최대부하 15~21시, 겨울(11~2월) 9~12시·16~19시.
+    토요일은 8~22시 중간부하·나머지 경부하, 일요일·공휴일은 하루 종일 경부하(임시공휴일 제외).
+    입력한 요금은 이 기기의 브라우저에만 저장됩니다.
+  </p>
+</div>
+
+<script>
+(function(){
+const EX=[
+ {id:'rd',name:'레드이엔지',color:'var(--red)',only:'slow',note:'아파트 완속 회원가'},
+ {id:'epit',name:'E-pit',color:'var(--epit)',only:'fast',note:'프라임 회원가 (일반 회원 460원, 비회원 530원). 충전 끝나고 15분 안에 출차하지 않으면 1분당 100원'},
+ {id:'sk',name:'SK일렉링크',color:'var(--sk)',speed:true,note:'회원가. 완속(30kW 미만)과 급속 요금이 달라요. 비회원 590원'},
+ {id:'kepco',name:'한전',color:'var(--kepco)',tiers:true,note:'KEPCO PLUG 회원·신용카드 결제 요금 (2026.8.1 시행). 다른 사업자 카드로 로밍하면 그 사업자 요금이 적용돼요'}];
+const DEF={pc:{off:289.8,mid:289.8,peak:319},env:[295,307.2,325.6,348.4,393.1],
+ ex:{rd:{on:true,tou:false,off:'295',mid:'',peak:''},epit:{on:true,tou:false,off:'325',mid:'',peak:''},sk:{on:true,tou:false,off:'',mid:'',peak:'',slow:'295',fast:'391'},kepco:{on:true,t:['295','307.2','325.6','348.4','393.1']}}};
+const clone=o=>JSON.parse(JSON.stringify(o));
+let S=clone(DEF);
+try{const s=localStorage.getItem('evRates2');if(s){const p=JSON.parse(s);S={pc:{...DEF.pc,...p.pc},env:p.env||DEF.env,ex:{}};EX.forEach(e=>S.ex[e.id]={...DEF.ex[e.id],...(p.ex||{})[e.id]})}}catch(e){}
+try{const p=JSON.parse(localStorage.getItem('evRates2')||'{}');if(p.ex&&p.ex.kepco&&!p.ex.kepco.t)S.ex.kepco=clone(DEF.ex.kepco)}catch(e){}
+EX.forEach(e=>{const x=S.ex[e.id];if(!x.on&&!x.off&&!x.slow&&!(x.t&&x.t[0])&&DEF.ex[e.id].on)S.ex[e.id]=clone(DEF.ex[e.id])});
+function save(){try{localStorage.setItem('evRates2',JSON.stringify(S))}catch(e){}}
+
+// 공휴일 (임시공휴일 제외, 대체공휴일 포함)
+const HOL=new Set(['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02','2026-05-05','2026-05-24','2026-05-25','2026-06-06','2026-08-15','2026-08-17','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-05','2026-10-09','2026-12-25',
+'2027-01-01','2027-02-06','2027-02-07','2027-02-08','2027-02-09','2027-03-01','2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-08-16','2027-09-14','2027-09-15','2027-09-16','2027-10-03','2027-10-04','2027-10-09','2027-10-11','2027-12-25','2027-12-27']);
+const pad=n=>String(n).padStart(2,'0');
+const key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const DOW='일월화수목금토';
+function dayType(d){if(d.getDay()===0||HOL.has(key(d)))return 'sun';if(d.getDay()===6)return 'sat';return 'wk'}
+function isWinter(m){return m>=11||m<=2}
+function bandAt(dt,hFrac){
+  const h=hFrac??(dt.getHours()+dt.getMinutes()/60);
+  const t=dayType(dt);
+  if(t==='sun')return 'off';
+  if(t==='sat')return (h>=8&&h<22)?'mid':'off';
+  if(h<8||h>=22)return 'off';
+  if(isWinter(dt.getMonth()+1)){ if((h>=9&&h<12)||(h>=16&&h<19))return 'peak'; return 'mid'; }
+  if(h>=15&&h<21)return 'peak'; return 'mid';
+}
+const BN={off:'경부하',mid:'중간부하',peak:'최대부하'};
+function envRate(kw){const e=S.env.map(Number);return kw<30?e[0]:kw<50?e[1]:kw<100?e[2]:kw<200?e[3]:e[4]}
+function exRate(id,b,kw){const x=S.ex[id];if(!x.on)return null;const E=EX.find(e=>e.id===id);if(E.tiers){const i=kw<30?0:kw<50?1:kw<100?2:kw<200?3:4;const v=parseFloat((x.t||[])[i]);return isFinite(v)?v:null}const n=parseFloat(E.speed?(kw<30?x.slow:x.fast):(x.tou?x[b]:x.off));return isFinite(n)?n:null}
+function cards(b,kw){
+  const a=[];if(kw<30)a.push({id:'pc',name:'파워큐브',color:'var(--pc)',r:Number(S.pc[b])});
+  a.push({id:'env',name:'환경부',color:'var(--env)',r:envRate(kw)});
+  EX.forEach(e=>{if(e.only==='slow'&&kw>=30)return;if(e.only==='fast'&&kw<30)return;const r=exRate(e.id,b,kw);if(r!=null)a.push({id:e.id,name:e.name,color:e.color,r})});
+  return a;
+}
+const best=(b,kw)=>cards(b,kw).sort((x,y)=>x.r-y.r);
+const fmt=(n,d=1)=>n.toLocaleString('ko-KR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const won=n=>Math.round(n).toLocaleString('ko-KR')+'원';
+const kwNow=()=>parseFloat(document.getElementById('cKw').value)||7;
+
+const SPEEDS=[{k:'s',l:'완속',sub:'7kW',kw:7},{k:'f1',l:'급속',sub:'30~50kW',kw:40},{k:'f2',l:'급속',sub:'50~100kW',kw:50},{k:'f3',l:'급속',sub:'100~200kW',kw:100},{k:'f4',l:'초급속',sub:'200kW 이상',kw:200}];
+const tierOf=kw=>kw<30?'s':kw<50?'f1':kw<100?'f2':kw<200?'f3':'f4';
+function setSpeed(k){const sp=SPEEDS.find(x=>x.k===k);document.getElementById('cKw').value=sp.kw;try{localStorage.setItem('evSpeed',k)}catch(e){}renderAll()}
+function renderSpeedbar(){const cur=tierOf(kwNow());
+  document.getElementById('speedbar').innerHTML=SPEEDS.map(x=>'<button type="button" data-k="'+x.k+'" aria-pressed="'+(x.k===cur)+'">'+x.l+'<small>'+x.sub+'</small></button>').join('');}
+document.getElementById('speedbar').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setSpeed(b.dataset.k)});
+function renderTable(){
+  const now=new Date(),b=bandAt(now),cur=tierOf(kwNow());
+  document.getElementById('spBand').textContent='· 지금 '+BN[b]+' 기준';
+  const cols=[{id:'pc',name:'파워큐브'},{id:'env',name:'환경부'}].concat(EX.map(e=>({id:e.id,name:e.name})));
+  let h='<thead><tr><th>속도</th>'+cols.map(c=>'<th>'+c.name+'</th>').join('')+'</tr></thead><tbody>';
+  SPEEDS.forEach(x=>{const cs=cards(b,x.kw),min=Math.min(...cs.map(c=>c.r));
+    h+='<tr data-k="'+x.k+'" class="'+(x.k===cur?'cur':'')+'" style="cursor:pointer"><td><b>'+x.l+'</b> <span class="sub num" style="font-size:11px">'+x.sub+'</span></td>'+
+    cols.map(c=>{const f=cs.find(y=>y.id===c.id);return f?'<td class="num'+(Math.abs(f.r-min)<0.05?' best':'')+'">'+fmt(f.r)+'</td>':'<td class="na">–</td>'}).join('')+'</tr>'});
+  document.getElementById('spTable').innerHTML=h+'</tbody>';
+}
+document.getElementById('spTable').addEventListener('click',e=>{const tr=e.target.closest('tr[data-k]');if(tr)setSpeed(tr.dataset.k)});
+function renderAll(){renderSpeedbar();renderNow();renderTable();renderStrip();calc()}
+
+function renderNow(){
+  const now=new Date(),b=bandAt(now),kw=kwNow();
+  document.getElementById('nowTime').textContent=pad(now.getHours())+':'+pad(now.getMinutes());
+  const t=dayType(now);
+  document.getElementById('nowDay').textContent=(now.getMonth()+1)+'월 '+now.getDate()+'일 ('+DOW[now.getDay()]+') · '+(t==='sun'?(now.getDay()===0?'일요일':'공휴일'):t==='sat'?'토요일':(isWinter(now.getMonth()+1)?'평일 · 겨울':'평일 · 봄여름가을'))+' · '+fmt(kw,0)+'kW 기준';
+  const p=document.getElementById('nowBand');p.textContent=BN[b];p.className='pill b-'+b;
+  const cs=best(b,kw),w=cs[0],ties=cs.filter(c=>Math.abs(c.r-w.r)<0.05),other=cs.find(c=>c.r-w.r>=0.05);
+  document.getElementById('verdict').innerHTML='지금 꽂으면 '+ties.map(c=>'<b style="color:'+c.color+'">'+c.name+'</b>').join(' · ')+' 카드<br><span class="sub">'+(other?other.name+'보다 kWh당 <span class="num">'+fmt(other.r-w.r)+'</span>원 싸요 (30kWh면 약 '+won((other.r-w.r)*30)+')':'모든 카드 요금이 같아요')+'</span>';
+  document.getElementById('nowRates').innerHTML=cards(b,kw).map(c=>'<div class="rate'+(Math.abs(c.r-w.r)<0.05?' win':'')+'"><div class="who" style="color:'+c.color+'">'+c.name+'</div><div class="v num">'+fmt(c.r)+'</div><div class="sub" style="font-size:11px">원/kWh</div></div>').join('');
+  let d=new Date(now);d.setSeconds(0,0);
+  for(let i=1;i<=48*60;i++){d=new Date(d.getTime()+60000);if(bandAt(d)!==b){
+    const nb=bandAt(d),nw=best(nb,kw)[0];
+    document.getElementById('nextChange').innerHTML=(key(d)===key(now)?'':'내일 ')+'<span class="num">'+pad(d.getHours())+':'+pad(d.getMinutes())+'</span>부터 '+BN[nb]+' → '+nw.name+' 카드가 유리';
+    return;}}
+  document.getElementById('nextChange').textContent='';
+}
+
+let stripDay='today';
+const TABS=[['today','오늘'],['wk-s','평일(3~10월)'],['wk-w','평일(11~2월)'],['sat','토요일'],['sun','일·공휴일']];
+function sampleDate(k){
+  if(k==='today')return new Date();
+  if(k==='wk-s')return new Date(2026,9,14);
+  if(k==='wk-w')return new Date(2026,11,16);
+  if(k==='sat')return new Date(2026,9,17);
+  return new Date(2026,9,18);
+}
+function renderStrip(){
+  document.getElementById('dayTabs').innerHTML=TABS.map(([k,l])=>'<button type="button" data-k="'+k+'" aria-pressed="'+(k===stripDay)+'">'+l+'</button>').join('');
+  const d=sampleDate(stripDay),kw=kwNow();
+  let s='',w='';const used=new Map();
+  for(let h=0;h<24;h++){const b=bandAt(d,h+.5);s+='<div class="b-'+b+'" title="'+h+'시 '+BN[b]+'"></div>';
+    const win=best(b,kw)[0];used.set(win.id,win);w+='<div style="background:'+win.color+'" title="'+h+'시 '+win.name+'"></div>';}
+  if(stripDay==='today'){const n=new Date();s+='<span class="nowmark" style="left:calc('+((n.getHours()+n.getMinutes()/60)/24*100)+'% - 1px)"></span>'}
+  document.getElementById('strip').innerHTML=s;document.getElementById('winrow').innerHTML=w;
+  document.getElementById('ticks').innerHTML=Array.from({length:24},(_,h)=>'<span>'+(h%3===0?h:'')+'</span>').join('');
+  document.getElementById('legend').innerHTML='<span><i class="b-off"></i>경부하</span><span><i class="b-mid"></i>중간부하</span><span><i class="b-peak"></i>최대부하</span>'+
+    [...used.values()].map(c=>'<span><i style="background:'+c.color+'"></i>'+c.name+' 유리</span>').join('');
+}
+document.getElementById('dayTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;stripDay=b.dataset.k;renderStrip()});
+
+const toLocal=d=>key(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+const cStart=document.getElementById('cStart');cStart.value=toLocal(new Date());
+document.getElementById('cNow').addEventListener('click',()=>{cStart.value=toLocal(new Date());calc()});
+function calc(){
+  const kwh=parseFloat(document.getElementById('cKwh').value),kw=parseFloat(document.getElementById('cKw').value),st=new Date(cStart.value);
+  const out=document.getElementById('result');
+  if(!(kwh>0)||!(kw>0)||isNaN(st)){out.innerHTML='<p class="note">시작 시각, 충전량, 출력을 모두 입력해 주세요.</p>';return}
+  const mins=Math.ceil(kwh/kw*60),per=kwh/mins;
+  const tot={},bandKwh={off:0,mid:0,peak:0};
+  for(let i=0;i<mins;i++){const t=new Date(st.getTime()+i*60000),b=bandAt(t);bandKwh[b]+=per;
+    cards(b,kw).forEach(c=>{(tot[c.id]||(tot[c.id]={name:c.name,color:c.color,sum:0})).sum+=c.r*per})}
+  const end=new Date(st.getTime()+mins*60000);
+  const list=Object.values(tot).sort((a,b)=>a.sum-b.sum),top=list[0];
+  const h=Math.floor(mins/60),m=mins%60;
+  out.innerHTML='<div class="summary">약 <b class="num">'+(h?h+'시간 ':'')+m+'분</b> 충전 · 끝나는 시각 <b class="num">'+(key(end)===key(st)?'':(end.getMonth()+1)+'/'+end.getDate()+' ')+pad(end.getHours())+':'+pad(end.getMinutes())+'</b></div>'+
+   '<div class="note">시간대별 충전량: '+['off','mid','peak'].filter(b=>bandKwh[b]>0.01).map(b=>BN[b]+' <span class="num">'+fmt(bandKwh[b])+'</span>kWh').join(' · ')+'</div>'+
+   list.map((c,i)=>{const d=c.sum-top.sum;return '<div class="res'+(d<0.5?' win':'')+'"><span class="n" style="color:'+c.color+'">'+c.name+(d<0.5?'<span class="tag">가장 쌈</span>':'')+'</span><span class="c num">'+won(c.sum)+'</span><span class="d">평균 <span class="num">'+fmt(c.sum/kwh)+'</span>원/kWh'+(d>=0.5?' · 가장 싼 카드보다 '+won(d)+' 더 비쌈':'')+'</span></div>'}).join('')+
+   '';
+}
+document.getElementById('cKwh').addEventListener('input',calc);
+document.getElementById('cKw').addEventListener('input',renderAll);
+cStart.addEventListener('input',calc);
+
+// 설정
+document.getElementById('extra').innerHTML=EX.map(e=>
+ '<div><div class="set-h"><span class="dot" style="background:'+e.color+'"></span>'+e.name+' 회원</div>'+
+ '<label class="chk" for="'+e.id+'On"><input id="'+e.id+'On" type="checkbox"> 비교에 포함</label>'+
+ (e.tiers?'<div class="grid3" style="margin-top:8px">'+['30kW 미만','30~50kW','50~100kW','100~200kW','200kW 이상'].map((l,i)=>'<label class="f" for="'+e.id+'T'+i+'">'+l+'<input id="'+e.id+'T'+i+'" class="num" type="number" step="0.1"></label>').join('')+'</div>':e.speed?
+ '<div class="grid3" style="margin-top:8px">'+
+ '<label class="f" for="'+e.id+'Slow">완속 (30kW 미만)<input id="'+e.id+'Slow" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
+ '<label class="f" for="'+e.id+'Fast">급속<input id="'+e.id+'Fast" class="num" type="number" step="0.1" placeholder="원/kWh"></label></div>'
+ :
+ '<label class="chk" for="'+e.id+'Tou" style="margin-top:6px"><input id="'+e.id+'Tou" type="checkbox"> 시간대별로 요금이 다름</label>'+
+ '<div class="grid3" style="margin-top:8px">'+
+ '<label class="f" for="'+e.id+'Off"><span id="'+e.id+'OffL">요금</span><input id="'+e.id+'Off" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
+ '<label class="f" for="'+e.id+'Mid" id="'+e.id+'MidW">중간부하<input id="'+e.id+'Mid" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
+ '<label class="f" for="'+e.id+'Peak" id="'+e.id+'PeakW">최대부하<input id="'+e.id+'Peak" class="num" type="number" step="0.1" placeholder="원/kWh"></label></div>')+
+ '<p class="note" style="margin-top:6px">'+e.note+'</p></div>').join('');
+const $=id=>document.getElementById(id);
+function toggleTou(id){const t=S.ex[id].tou;$(id+'MidW').hidden=!t;$(id+'PeakW').hidden=!t;$(id+'OffL').textContent=t?'경부하':'요금 (원/kWh)'}
+function fillSettings(){
+  $('pcOff').value=S.pc.off;$('pcMid').value=S.pc.mid;$('pcPeak').value=S.pc.peak;
+  S.env.forEach((v,i)=>$('e'+(i+1)).value=v);
+  EX.forEach(e=>{const x=S.ex[e.id];$(e.id+'On').checked=x.on;if(e.tiers){for(let i=0;i<5;i++)$(e.id+'T'+i).value=(x.t||[])[i]||'';return}if(e.speed){$(e.id+'Slow').value=x.slow||'';$(e.id+'Fast').value=x.fast||'';return}$(e.id+'Tou').checked=x.tou;$(e.id+'Off').value=x.off;$(e.id+'Mid').value=x.mid;$(e.id+'Peak').value=x.peak;toggleTou(e.id)});
+}
+function all(){renderAll()}
+[['pcOff','off'],['pcMid','mid'],['pcPeak','peak']].forEach(([id,k])=>$(id).addEventListener('input',e=>{S.pc[k]=parseFloat(e.target.value)||0;save();all()}));
+for(let i=1;i<=5;i++)$('e'+i).addEventListener('input',e=>{S.env[i-1]=parseFloat(e.target.value)||0;save();all()});
+EX.forEach(e=>{
+  $(e.id+'On').addEventListener('change',ev=>{S.ex[e.id].on=ev.target.checked;save();all()});
+  if(e.tiers){for(let i=0;i<5;i++)$(e.id+'T'+i).addEventListener('input',ev=>{(S.ex[e.id].t||(S.ex[e.id].t=[]))[i]=ev.target.value;save();all()});return}
+  if(!e.speed)$(e.id+'Tou').addEventListener('change',ev=>{S.ex[e.id].tou=ev.target.checked;toggleTou(e.id);save();all()});
+  (e.speed?[['Slow','slow'],['Fast','fast']]:[['Off','off'],['Mid','mid'],['Peak','peak']]).forEach(([s,k])=>$(e.id+s).addEventListener('input',ev=>{S.ex[e.id][k]=ev.target.value;if(ev.target.value!==''&&!S.ex[e.id].on){S.ex[e.id].on=true;$(e.id+'On').checked=true}save();all()}));
+});
+$('reset').addEventListener('click',()=>{S=clone(DEF);save();fillSettings();all();$('resetMsg').textContent='기본값으로 되돌렸어요'});
+
+try{const k=localStorage.getItem('evSpeed');const sp=SPEEDS.find(x=>x.k===k);if(sp)document.getElementById('cKw').value=sp.kw}catch(e){}
+fillSettings();all();
+setInterval(()=>{renderNow();renderTable();if(stripDay==='today')renderStrip()},30000);
+})();
+</script>
+
+</body>
+</html>
