@@ -1,4 +1,4 @@
-const CACHE = 'evcharge-v1';
+const CACHE = 'evcharge-v2';
 const CORE = [
   './',
   './index.html',
