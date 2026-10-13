@@ -246,6 +246,7 @@ function renderTable(){
 document.getElementById('spTable').addEventListener('click',e=>{const tr=e.target.closest('tr[data-k]');if(tr)setSpeed(tr.dataset.k)});
 function renderAll(){renderSpeedbar();renderNow();renderTable();renderStrip();calc()}
 
+const pickEnv=ties=>ties.length>1&&ties.some(c=>c.id==='env')?ties.filter(c=>c.id==='env'):ties; // 동률이면 환경부만 표시
 function renderNow(){
   const now=new Date(),b=bandAt(now),kw=kwNow();
   document.getElementById('nowTime').textContent=pad(now.getHours())+':'+pad(now.getMinutes());
@@ -254,11 +255,11 @@ function renderNow(){
   const p=document.getElementById('nowBand');p.textContent=BN[b];p.className='pill b-'+b;
   const pl=plan(now);let win;
   if(!pl.err){
-    const top=pl.list[0],ties=pl.list.filter(c=>c.sum-top.sum<0.5),other=pl.list.find(c=>c.sum-top.sum>=0.5);
+    const top=pl.list[0],ties=pickEnv(pl.list.filter(c=>c.sum-top.sum<0.5)),other=pl.list.find(c=>c.sum-top.sum>=0.5);
     win=new Set(ties.map(c=>c.id));
     document.getElementById('verdict').innerHTML='지금 꽂으면 '+ties.map(c=>'<b style="color:'+c.color+'">'+c.name+'</b>').join(' · ')+' 카드<br><span class="sub">'+(other?other.name+'보다 이 충전 전체로 약 <span class="num">'+won(other.sum-top.sum)+'</span> 싸요':'모든 카드 요금이 같아요')+' · <span class="num">'+pad(now.getHours())+':'+pad(now.getMinutes())+'</span>~<span class="num">'+endStr(pl.end,now)+'</span> 충전 기준(시간대 변화 반영)</span>';
   }else{
-    const cs=best(b,kw),w=cs[0],ties=cs.filter(c=>Math.abs(c.r-w.r)<0.05),other=cs.find(c=>c.r-w.r>=0.05);
+    const cs=best(b,kw),w=cs[0],ties=pickEnv(cs.filter(c=>Math.abs(c.r-w.r)<0.05)),other=cs.find(c=>c.r-w.r>=0.05);
     win=new Set(ties.map(c=>c.id));
     document.getElementById('verdict').innerHTML='지금 단가가 가장 싼 카드는 '+ties.map(c=>'<b style="color:'+c.color+'">'+c.name+'</b>').join(' · ')+'<br><span class="sub">'+(other?other.name+'보다 kWh당 <span class="num">'+fmt(other.r-w.r)+'</span>원 싸요':'모든 카드 요금이 같아요')+' · 배터리 정보를 입력하면 충전 전체 요금으로 비교해요</span>';
   }
