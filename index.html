@@ -150,19 +150,29 @@ table.sp tr.cur td{background:var(--accent-soft)}
   <section aria-labelledby="calc-h">
     <h2 id="calc-h">충전 요금 계산기</h2>
     <div class="grid2">
-      <label class="f" for="cStart">충전 시작
-        <input id="cStart" type="datetime-local">
-      </label>
-      <label class="f" for="cKwh">충전량 (kWh)
-        <input id="cKwh" class="num" type="number" min="1" step="1" value="30" inputmode="decimal">
+      <label class="f" for="cCap">배터리 용량 (kWh)
+        <input id="cCap" class="num" type="number" min="1" step="0.1" value="77.4" inputmode="decimal">
       </label>
       <label class="f" for="cKw">충전기 출력 (kW)
         <input id="cKw" class="num" type="number" min="1" step="0.1" value="7" inputmode="decimal">
+      </label>
+      <label class="f" for="cCur">현재 잔량 (%)
+        <input id="cCur" class="num" type="number" min="0" max="100" step="1" value="20" inputmode="decimal">
+      </label>
+      <label class="f" for="cTS" id="cTSW">목표 잔량 · 완속 (%)
+        <input id="cTS" class="num" type="number" min="1" max="100" step="1" value="90" inputmode="decimal">
+      </label>
+      <label class="f" for="cTF" id="cTFW" hidden>목표 잔량 · 급속 (%)
+        <input id="cTF" class="num" type="number" min="1" max="100" step="1" value="80" inputmode="decimal">
+      </label>
+      <label class="f" for="cStart">충전 시작
+        <input id="cStart" type="datetime-local">
       </label>
       <label class="f" for="cNow">&nbsp;
         <button id="cNow" type="button">지금부터로 맞추기</button>
       </label>
     </div>
+    <p class="note" style="margin-top:8px">기본값은 아이오닉5 롱레인지(23년식) 총 배터리 용량 77.4kWh예요. 실제 쓸 수 있는 용량은 조금 다를 수 있고, 급속은 충전 후반에 속도가 느려져 시간이 더 걸려요.</p>
     <div class="result" id="result"></div>
   </section>
 
@@ -309,26 +319,37 @@ function renderStrip(){
 }
 document.getElementById('dayTabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;stripDay=b.dataset.k;renderStrip()});
 
+const $=id=>document.getElementById(id);
 const toLocal=d=>key(d)+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
 const cStart=document.getElementById('cStart');cStart.value=toLocal(new Date());
 document.getElementById('cNow').addEventListener('click',()=>{cStart.value=toLocal(new Date());calc()});
+const CAR_MAX={ac:11,dc:235}; // 아이오닉5 차량 최대 수신 출력(kW): 완속 온보드 충전기 / 급속
+const num=id=>parseFloat(document.getElementById(id).value);
+function saveBatt(){try{localStorage.setItem('evBatt',JSON.stringify({cap:$('cCap').value,cur:$('cCur').value,ts:$('cTS').value,tf:$('cTF').value}))}catch(e){}}
+function loadBatt(){try{const b=JSON.parse(localStorage.getItem('evBatt')||'null');if(b){$('cCap').value=b.cap;$('cCur').value=b.cur;$('cTS').value=b.ts;$('cTF').value=b.tf}}catch(e){}}
 function calc(){
-  const kwh=parseFloat(document.getElementById('cKwh').value),kw=parseFloat(document.getElementById('cKw').value),st=new Date(cStart.value);
+  const kw=num('cKw'),cap=num('cCap'),cur=num('cCur'),st=new Date(cStart.value);
+  const slow=kw<30,tgt=num(slow?'cTS':'cTF');
+  $('cTSW').hidden=!slow;$('cTFW').hidden=slow;
   const out=document.getElementById('result');
-  if(!(kwh>0)||!(kw>0)||isNaN(st)){out.innerHTML='<p class="note">시작 시각, 충전량, 출력을 모두 입력해 주세요.</p>';return}
-  const mins=Math.ceil(kwh/kw*60),per=kwh/mins;
+  if(!(kw>0)||!(cap>0)||!(cur>=0)||!(tgt>0)||isNaN(st)){out.innerHTML='<p class="note">시작 시각, 배터리 용량, 잔량, 출력을 모두 입력해 주세요.</p>';return}
+  if(tgt<=cur){out.innerHTML='<p class="note">목표 잔량이 현재 잔량보다 높아야 해요.</p>';return}
+  const kwh=cap*(tgt-cur)/100,carMax=slow?CAR_MAX.ac:CAR_MAX.dc,kwEff=Math.min(kw,carMax);
+  const mins=Math.ceil(kwh/kwEff*60),per=kwh/mins;
   const tot={},bandKwh={off:0,mid:0,peak:0};
   for(let i=0;i<mins;i++){const t=new Date(st.getTime()+i*60000),b=bandAt(t);bandKwh[b]+=per;
     cards(b,kw).forEach(c=>{(tot[c.id]||(tot[c.id]={name:c.name,color:c.color,sum:0})).sum+=c.r*per})}
   const end=new Date(st.getTime()+mins*60000);
   const list=Object.values(tot).sort((a,b)=>a.sum-b.sum),top=list[0];
   const h=Math.floor(mins/60),m=mins%60;
-  out.innerHTML='<div class="summary">약 <b class="num">'+(h?h+'시간 ':'')+m+'분</b> 충전 · 끝나는 시각 <b class="num">'+(key(end)===key(st)?'':(end.getMonth()+1)+'/'+end.getDate()+' ')+pad(end.getHours())+':'+pad(end.getMinutes())+'</b></div>'+
+  out.innerHTML='<div class="summary"><b class="num">'+fmt(cur,0)+'% → '+fmt(tgt,0)+'%</b> · 충전량 <b class="num">'+fmt(kwh)+'</b>kWh</div>'+
+   '<div class="summary">약 <b class="num">'+(h?h+'시간 ':'')+m+'분</b> 충전 · 끝나는 시각 <b class="num">'+(key(end)===key(st)?'':(end.getMonth()+1)+'/'+end.getDate()+' ')+pad(end.getHours())+':'+pad(end.getMinutes())+'</b></div>'+
+   (kwEff<kw?'<div class="note">충전기는 '+fmt(kw,0)+'kW지만 차가 받는 최대 출력(<span class="num">'+fmt(carMax,0)+'</span>kW)으로 계산했어요.</div>':'')+
    '<div class="note">시간대별 충전량: '+['off','mid','peak'].filter(b=>bandKwh[b]>0.01).map(b=>BN[b]+' <span class="num">'+fmt(bandKwh[b])+'</span>kWh').join(' · ')+'</div>'+
    list.map((c,i)=>{const d=c.sum-top.sum;return '<div class="res'+(d<0.5?' win':'')+'"><span class="n" style="color:'+c.color+'">'+c.name+(d<0.5?'<span class="tag">가장 쌈</span>':'')+'</span><span class="c num">'+won(c.sum)+'</span><span class="d">평균 <span class="num">'+fmt(c.sum/kwh)+'</span>원/kWh'+(d>=0.5?' · 가장 싼 카드보다 '+won(d)+' 더 비쌈':'')+'</span></div>'}).join('')+
    '';
 }
-document.getElementById('cKwh').addEventListener('input',calc);
+['cCap','cCur','cTS','cTF'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{saveBatt();calc()}));
 document.getElementById('cKw').addEventListener('input',renderAll);
 cStart.addEventListener('input',calc);
 
@@ -347,7 +368,6 @@ document.getElementById('extra').innerHTML=EX.map(e=>
  '<label class="f" for="'+e.id+'Mid" id="'+e.id+'MidW">중간부하<input id="'+e.id+'Mid" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
  '<label class="f" for="'+e.id+'Peak" id="'+e.id+'PeakW">최대부하<input id="'+e.id+'Peak" class="num" type="number" step="0.1" placeholder="원/kWh"></label></div>')+
  '<p class="note" style="margin-top:6px">'+e.note+'</p></div>').join('');
-const $=id=>document.getElementById(id);
 function toggleTou(id){const t=S.ex[id].tou;$(id+'MidW').hidden=!t;$(id+'PeakW').hidden=!t;$(id+'OffL').textContent=t?'경부하':'요금 (원/kWh)'}
 function fillSettings(){
   $('pcOff').value=S.pc.off;$('pcMid').value=S.pc.mid;$('pcPeak').value=S.pc.peak;
@@ -366,7 +386,7 @@ EX.forEach(e=>{
 $('reset').addEventListener('click',()=>{S=clone(DEF);save();fillSettings();all();$('resetMsg').textContent='기본값으로 되돌렸어요'});
 
 try{const k=localStorage.getItem('evSpeed');const sp=SPEEDS.find(x=>x.k===k);if(sp)document.getElementById('cKw').value=sp.kw}catch(e){}
-fillSettings();all();
+loadBatt();fillSettings();all();
 setInterval(()=>{renderNow();renderTable();if(stripDay==='today')renderStrip()},30000);
 })();
 </script>
