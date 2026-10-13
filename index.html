@@ -171,9 +171,7 @@ table.sp tr.cur td{background:var(--accent-soft)}
       <label class="f" for="cStart">충전 시작
         <input id="cStart" type="datetime-local">
       </label>
-      <label class="f" for="cNow">&nbsp;
-        <button id="cNow" type="button">지금부터로 맞추기</button>
-      </label>
+      <div style="grid-column:1/-1"><button id="cNow" type="button" style="width:100%">지금부터로 맞추기</button></div>
     </div>
     <p class="note" style="margin-top:8px">기본값은 아이오닉5 롱레인지(23년식) 총 배터리 용량 77.4kWh예요. 실제 쓸 수 있는 용량은 조금 다를 수 있고, 급속은 충전 후반에 속도가 느려져 시간이 더 걸려요.</p>
     <div class="result" id="result"></div>
