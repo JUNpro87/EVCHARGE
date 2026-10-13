@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-/* Layout: 한 열 모바일 도구 — 지금 상태 → 오늘 24시간 띠 → 계산기 → 요금 설정 */
+/* Layout: 한 열 모바일 도구 — 지금 상태 → 오늘 24시간 띠 → 계산기 */
 :root{
   color-scheme:light;
   --bg:#f3f5f4; --surface:#ffffff; --fg:#17201d; --muted:#5d6b66; --line:#d9e0dd;
@@ -176,40 +176,10 @@ table.sp tr.cur td{background:var(--accent-soft)}
     <div class="result" id="result"></div>
   </section>
 
-  <section>
-    <details id="setBox">
-      <summary>요금 설정 (내가 직접 수정 가능)</summary>
-      <div class="settings">
-        <div>
-          <div class="set-h"><span class="dot" style="background:var(--pc)"></span>파워큐브 회원 (계시별)</div>
-          <div class="grid3">
-            <label class="f" for="pcOff">경부하<input id="pcOff" class="num" type="number" step="0.1"></label>
-            <label class="f" for="pcMid">중간부하<input id="pcMid" class="num" type="number" step="0.1"></label>
-            <label class="f" for="pcPeak">최대부하<input id="pcPeak" class="num" type="number" step="0.1"></label>
-          </div>
-          <p class="note" style="margin-top:6px">2026.8.4 적용 공지 기준. 부가세 포함.</p>
-        </div>
-        <div>
-          <div class="set-h"><span class="dot" style="background:var(--env)"></span>환경부 카드 (출력별 단일요금)</div>
-          <div class="grid3">
-            <label class="f" for="e1">30kW 미만<input id="e1" class="num" type="number" step="0.1"></label>
-            <label class="f" for="e2">30~50kW<input id="e2" class="num" type="number" step="0.1"></label>
-            <label class="f" for="e3">50~100kW<input id="e3" class="num" type="number" step="0.1"></label>
-            <label class="f" for="e4">100~200kW<input id="e4" class="num" type="number" step="0.1"></label>
-            <label class="f" for="e5">200kW 이상<input id="e5" class="num" type="number" step="0.1"></label>
-          </div>
-          <p class="note" style="margin-top:6px">환경부 충전소에서, 그리고 다른 사업자 충전기에서 환경부 카드로 로밍 결제할 때 적용되는 요금이에요. 2026.8.1 개편, 시간대와 상관없이 같음.</p>
-        </div>
-        <div id="extra" class="settings" style="margin-top:0"></div>
-        <div><button id="reset" type="button">기본값으로 되돌리기</button> <span class="note" id="resetMsg"></span></div>
-      </div>
-    </details>
-  </section>
-
   <p class="foot">
     시간대 구분은 한국전력 계시별 요금 기준입니다. 봄·여름·가을(3~10월) 최대부하 15~21시, 겨울(11~2월) 9~12시·16~19시.
     토요일은 8~22시 중간부하·나머지 경부하, 일요일·공휴일은 하루 종일 경부하(임시공휴일 제외).
-    입력한 요금은 이 기기의 브라우저에만 저장됩니다.
+    입력한 배터리 정보는 이 기기의 브라우저에만 저장됩니다.
   </p>
 </div>
 
@@ -224,10 +194,6 @@ const DEF={pc:{off:289.8,mid:289.8,peak:319},env:[295,307.2,325.6,348.4,393.1],
  ex:{rd:{on:true,tou:false,off:'295',mid:'',peak:''},epit:{on:true,tou:false,off:'325',mid:'',peak:''},sk:{on:true,tou:false,off:'',mid:'',peak:'',slow:'295',fast:'391'},kepco:{on:true,t:['295','307.2','325.6','348.4','393.1']}}};
 const clone=o=>JSON.parse(JSON.stringify(o));
 let S=clone(DEF);
-try{const s=localStorage.getItem('evRates2');if(s){const p=JSON.parse(s);S={pc:{...DEF.pc,...p.pc},env:p.env||DEF.env,ex:{}};EX.forEach(e=>S.ex[e.id]={...DEF.ex[e.id],...(p.ex||{})[e.id]})}}catch(e){}
-try{const p=JSON.parse(localStorage.getItem('evRates2')||'{}');if(p.ex&&p.ex.kepco&&!p.ex.kepco.t)S.ex.kepco=clone(DEF.ex.kepco)}catch(e){}
-EX.forEach(e=>{const x=S.ex[e.id];if(!x.on&&!x.off&&!x.slow&&!(x.t&&x.t[0])&&DEF.ex[e.id].on)S.ex[e.id]=clone(DEF.ex[e.id])});
-function save(){try{localStorage.setItem('evRates2',JSON.stringify(S))}catch(e){}}
 
 // 공휴일 (임시공휴일 제외, 대체공휴일 포함)
 const HOL=new Set(['2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02','2026-05-05','2026-05-24','2026-05-25','2026-06-06','2026-08-15','2026-08-17','2026-09-24','2026-09-25','2026-09-26','2026-10-03','2026-10-05','2026-10-09','2026-12-25',
@@ -353,40 +319,8 @@ function calc(){
 document.getElementById('cKw').addEventListener('input',renderAll);
 cStart.addEventListener('input',calc);
 
-// 설정
-document.getElementById('extra').innerHTML=EX.map(e=>
- '<div><div class="set-h"><span class="dot" style="background:'+e.color+'"></span>'+e.name+' 회원</div>'+
- '<label class="chk" for="'+e.id+'On"><input id="'+e.id+'On" type="checkbox"> 비교에 포함</label>'+
- (e.tiers?'<div class="grid3" style="margin-top:8px">'+['30kW 미만','30~50kW','50~100kW','100~200kW','200kW 이상'].map((l,i)=>'<label class="f" for="'+e.id+'T'+i+'">'+l+'<input id="'+e.id+'T'+i+'" class="num" type="number" step="0.1"></label>').join('')+'</div>':e.speed?
- '<div class="grid3" style="margin-top:8px">'+
- '<label class="f" for="'+e.id+'Slow">완속 (30kW 미만)<input id="'+e.id+'Slow" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
- '<label class="f" for="'+e.id+'Fast">급속<input id="'+e.id+'Fast" class="num" type="number" step="0.1" placeholder="원/kWh"></label></div>'
- :
- '<label class="chk" for="'+e.id+'Tou" style="margin-top:6px"><input id="'+e.id+'Tou" type="checkbox"> 시간대별로 요금이 다름</label>'+
- '<div class="grid3" style="margin-top:8px">'+
- '<label class="f" for="'+e.id+'Off"><span id="'+e.id+'OffL">요금</span><input id="'+e.id+'Off" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
- '<label class="f" for="'+e.id+'Mid" id="'+e.id+'MidW">중간부하<input id="'+e.id+'Mid" class="num" type="number" step="0.1" placeholder="원/kWh"></label>'+
- '<label class="f" for="'+e.id+'Peak" id="'+e.id+'PeakW">최대부하<input id="'+e.id+'Peak" class="num" type="number" step="0.1" placeholder="원/kWh"></label></div>')+
- '<p class="note" style="margin-top:6px">'+e.note+'</p></div>').join('');
-function toggleTou(id){const t=S.ex[id].tou;$(id+'MidW').hidden=!t;$(id+'PeakW').hidden=!t;$(id+'OffL').textContent=t?'경부하':'요금 (원/kWh)'}
-function fillSettings(){
-  $('pcOff').value=S.pc.off;$('pcMid').value=S.pc.mid;$('pcPeak').value=S.pc.peak;
-  S.env.forEach((v,i)=>$('e'+(i+1)).value=v);
-  EX.forEach(e=>{const x=S.ex[e.id];$(e.id+'On').checked=x.on;if(e.tiers){for(let i=0;i<5;i++)$(e.id+'T'+i).value=(x.t||[])[i]||'';return}if(e.speed){$(e.id+'Slow').value=x.slow||'';$(e.id+'Fast').value=x.fast||'';return}$(e.id+'Tou').checked=x.tou;$(e.id+'Off').value=x.off;$(e.id+'Mid').value=x.mid;$(e.id+'Peak').value=x.peak;toggleTou(e.id)});
-}
-function all(){renderAll()}
-[['pcOff','off'],['pcMid','mid'],['pcPeak','peak']].forEach(([id,k])=>$(id).addEventListener('input',e=>{S.pc[k]=parseFloat(e.target.value)||0;save();all()}));
-for(let i=1;i<=5;i++)$('e'+i).addEventListener('input',e=>{S.env[i-1]=parseFloat(e.target.value)||0;save();all()});
-EX.forEach(e=>{
-  $(e.id+'On').addEventListener('change',ev=>{S.ex[e.id].on=ev.target.checked;save();all()});
-  if(e.tiers){for(let i=0;i<5;i++)$(e.id+'T'+i).addEventListener('input',ev=>{(S.ex[e.id].t||(S.ex[e.id].t=[]))[i]=ev.target.value;save();all()});return}
-  if(!e.speed)$(e.id+'Tou').addEventListener('change',ev=>{S.ex[e.id].tou=ev.target.checked;toggleTou(e.id);save();all()});
-  (e.speed?[['Slow','slow'],['Fast','fast']]:[['Off','off'],['Mid','mid'],['Peak','peak']]).forEach(([s,k])=>$(e.id+s).addEventListener('input',ev=>{S.ex[e.id][k]=ev.target.value;if(ev.target.value!==''&&!S.ex[e.id].on){S.ex[e.id].on=true;$(e.id+'On').checked=true}save();all()}));
-});
-$('reset').addEventListener('click',()=>{S=clone(DEF);save();fillSettings();all();$('resetMsg').textContent='기본값으로 되돌렸어요'});
-
 try{const k=localStorage.getItem('evSpeed');const sp=SPEEDS.find(x=>x.k===k);if(sp)document.getElementById('cKw').value=sp.kw}catch(e){}
-loadBatt();fillSettings();all();
+loadBatt();renderAll();
 setInterval(()=>{renderNow();renderTable();if(stripDay==='today')renderStrip()},30000);
 })();
 </script>
